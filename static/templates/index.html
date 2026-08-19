@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NetWatch — Aruba Monitor</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<div class="shell">
+
+  <!-- ═══ TOPBAR ═══════════════════════════════════════════ -->
+  <header class="topbar">
+    <div class="brand">
+      <div>
+        <div class="brand-name">NETWATCH</div>
+        <div class="brand-sub">ARUBA CENTRAL MONITOR</div>
+      </div>
+    </div>
+
+    <div class="topbar-mid">
+      <div class="live-badge">
+        <div class="live-dot"></div>
+        LIVE
+      </div>
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="poll-label">NEXT POLL IN <span id="countdown">60</span>s</div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="health-wrap">
+        <span class="health-label">NETWORK HEALTH</span>
+        <div class="health-track">
+          <div class="health-fill"></div>
+        </div>
+        <span class="health-val">87.5%</span>
+      </div>
+      <button class="btn" onclick="triggerRefresh()">&#8635; REFRESH</button>
+    </div>
+  </header>
+
+  <!-- ═══ SIDEBAR ══════════════════════════════════════════ -->
+  <nav class="sidebar">
+    <div class="nav-section">MONITORING</div>
+    <div class="nav-item active" onclick="showView('status', this)">
+      &#9632; AP Status
+      <span class="nav-badge nb-red">3</span>
+    </div>
+    <div class="nav-item" onclick="showView('analytics', this)">
+      &#9650; Analytics
+    </div>
+    <div class="nav-item" onclick="showView('clients', this)">
+      &#9670; Client Log
+    </div>
+
+    <div class="nav-section">SYSTEM</div>
+    <div class="nav-item" onclick="showView('config', this)">
+      &#9881; API Config
+    </div>
+    <div class="nav-item" onclick="showView('logs', this)">
+      &#9776; Poll Log
+      <span class="nav-badge nb-amber">1</span>
+    </div>
+
+    <div class="nav-section">DATA</div>
+    <div class="nav-item" onclick="showView('database', this)">
+      &#9651; Database
+      <span class="nav-badge nb-green">OK</span>
+    </div>
+  </nav>
+
+  <!-- ═══ MAIN ══════════════════════════════════════════════ -->
+  <main class="main">
+
+    <!-- ──────────────────────────────────────────────────────
+         VIEW 1 — AP STATUS
+         ────────────────────────────────────────────────────── -->
+    <div class="view active" id="view-status">
+
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">ACCESS POINT STATUS</div>
+          <div class="page-sub">Last polled: <span id="last-poll">14:32:07</span> &nbsp;·&nbsp; 24 APs monitored</div>
+        </div>
+        <button class="btn">&#11015; EXPORT CSV</button>
+      </div>
+
+      <!-- Stat cards -->
+      <div class="stats">
+        <div class="stat-card c-cyan">
+          <div class="stat-label">TOTAL APS</div>
+          <div class="stat-val">24</div>
+          <div class="stat-sub">3 floors · main building</div>
+        </div>
+        <div class="stat-card c-green">
+          <div class="stat-label">ONLINE</div>
+          <div class="stat-val">21</div>
+          <div class="stat-sub">87.5% availability</div>
+        </div>
+        <div class="stat-card c-red">
+          <div class="stat-label">OFFLINE</div>
+          <div class="stat-val">3</div>
+          <div class="stat-sub">since 09:14 today</div>
+        </div>
+        <div class="stat-card c-amber">
+          <div class="stat-label">ACTIVE CLIENTS</div>
+          <div class="stat-val">186</div>
+          <div class="stat-sub">+12 vs last hour</div>
+        </div>
+      </div>
+
+      <!-- AP table panel -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">// ACCESS POINTS</div>
+          <div style="display:flex; gap:6px; align-items:center;">
+            <input class="search-input" style="width:220px;" type="text"
+                   placeholder="Search name or location..."
+                   oninput="searchAPs(this.value)" />
+            <div class="filter-chip active" onclick="filterAP('all', this)">ALL</div>
+            <div class="filter-chip" onclick="filterAP('online', this)">ONLINE</div>
+            <div class="filter-chip" onclick="filterAP('offline', this)">OFFLINE</div>
+            <div class="filter-chip" onclick="filterAP('warn', this)">ALERTS</div>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:20px;"></th>
+                <th>AP NAME / LOCATION</th>
+                <th>STATUS</th>
+                <th>CLIENTS</th>
+                <th>LOAD</th>
+                <th>UPTIME</th>
+                <th>MODEL</th>
+              </tr>
+            </thead>
+            <tbody id="ap-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div><!-- /view-status -->
+
+
+    <!-- ──────────────────────────────────────────────────────
+         VIEW 2 — ANALYTICS
+         ────────────────────────────────────────────────────── -->
+    <div class="view" id="view-analytics">
+
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">AP ANALYTICS</div>
+          <div class="page-sub">Client traffic over time · identify busy access points</div>
+        </div>
+        <div style="display:flex; gap:6px;">
+          <div class="filter-chip active">TODAY</div>
+          <div class="filter-chip">WEEK</div>
+          <div class="filter-chip">MONTH</div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card c-green">
+          <div class="stat-label">PEAK CLIENTS</div>
+          <div class="stat-val">47</div>
+          <div class="stat-sub">AP-202-DevZone · 13:00</div>
+        </div>
+        <div class="stat-card c-cyan">
+          <div class="stat-label">AVG CLIENTS / AP</div>
+          <div class="stat-val">8.9</div>
+          <div class="stat-sub">across online APs</div>
+        </div>
+        <div class="stat-card c-amber">
+          <div class="stat-label">BUSIEST HOUR</div>
+          <div class="stat-val">13:00</div>
+          <div class="stat-sub">lunch peak</div>
+        </div>
+        <div class="stat-card c-cyan">
+          <div class="stat-label">TOTAL SESSIONS</div>
+          <div class="stat-val">431</div>
+          <div class="stat-sub">today so far</div>
+        </div>
+      </div>
+
+      <!-- Chart panel -->
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">// CLIENTS OVER TIME</div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <select id="ap-sel-1" onchange="updateLineChart()">
+              <option value="0">AP-101 Reception</option>
+              <option value="1">AP-102 Open Plan</option>
+              <option value="2" selected>AP-202 Dev Zone</option>
+              <option value="3">AP-201 Conf Room</option>
+            </select>
+            <select id="ap-sel-2" onchange="updateLineChart()">
+              <option value="0" selected>AP-101 Reception</option>
+              <option value="1">AP-102 Open Plan</option>
+              <option value="2">AP-202 Dev Zone</option>
+              <option value="3">AP-201 Conf Room</option>
+            </select>
+          </div>
+        </div>
+        <div class="panel-body">
+          <canvas id="lineChart" height="180"></canvas>
+        </div>
+      </div>
+
+      <div class="two-col">
+        <!-- Hourly load -->
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-hdr"><div class="panel-title">// HOURLY LOAD</div></div>
+          <div class="panel-body">
+            <canvas id="barChart" height="150"></canvas>
+          </div>
+        </div>
+
+        <!-- Top APs -->
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-hdr"><div class="panel-title">// BUSIEST APS TODAY</div></div>
+          <div class="panel-body">
+            <div class="rank-list" id="rank-list">
+              <!-- Populated by JS -->
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /view-analytics -->
+
+
+    <!-- ──────────────────────────────────────────────────────
+         VIEW 3 — CLIENT LOG
+         ────────────────────────────────────────────────────── -->
+    <div class="view" id="view-clients">
+
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">CLIENT LOG</div>
+          <div class="page-sub">Search · filter · track device history</div>
+        </div>
+        <button class="btn">&#11015; EXPORT CSV</button>
+      </div>
+
+      <div class="search-bar">
+        <input class="search-input" type="text" id="client-search"
+               placeholder="Search hostname, MAC, IP, username, vendor..."
+               oninput="searchClients(this.value)" />
+        <select onchange="filterClientStatus(this.value)">
+          <option value="all">ALL STATUS</option>
+          <option value="connected">CONNECTED</option>
+          <option value="disconnected">DISCONNECTED</option>
+        </select>
+        <select id="ap-filter-sel" onchange="filterClientAP(this.value)">
+          <option value="all">ALL APS</option>
+        </select>
+        <select>
+          <option>TODAY</option>
+          <option>LAST 7 DAYS</option>
+          <option>LAST 30 DAYS</option>
+        </select>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hdr">
+          <div class="panel-title">// CLIENT RECORDS &nbsp;
+            <span id="client-count" style="color:var(--text2); font-weight:normal;">12 entries</span>
+          </div>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:16px;"></th>
+                <th>HOSTNAME</th>
+                <th>IP ADDRESS</th>
+                <th>MAC ADDRESS</th>
+                <th>USERNAME</th>
+                <th>ACCESS POINT</th>
+                <th>VENDOR / OS</th>
+                <th>STATUS</th>
+                <th>TIME</th>
+              </tr>
+            </thead>
+            <tbody id="client-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Device movement trail (shown on row click) -->
+      <div class="panel" id="trail-panel" style="display:none;">
+        <div class="panel-hdr">
+          <div class="panel-title" id="trail-title">// DEVICE MOVEMENT TRAIL</div>
+          <button class="btn" onclick="closeTrail()">CLOSE</button>
+        </div>
+        <div class="panel-body">
+          <div class="two-col">
+            <div>
+              <div class="section-lbl">DEVICE INFO</div>
+              <div class="detail-grid" id="trail-device-info"></div>
+            </div>
+            <div>
+              <div class="section-lbl">MOVEMENT TIMELINE</div>
+              <div class="timeline" id="trail-timeline"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /view-clients -->
+
+
+    <!-- ──────────────────────────────────────────────────────
+         VIEW 4 — API CONFIG
+         ────────────────────────────────────────────────────── -->
+    <div class="view" id="view-config">
+
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">API CONFIGURATION</div>
+          <div class="page-sub">HPE Aruba Central connection &amp; polling schedule</div>
+        </div>
+      </div>
+
+      <div class="stats">
+        <div class="stat-card c-green">
+          <div class="stat-label">API STATUS</div>
+          <div class="stat-val" style="font-size:14px; margin-top:4px;">&#9679; CONNECTED</div>
+          <div class="stat-sub">Token expires in 6h 14m</div>
+        </div>
+        <div class="stat-card c-cyan">
+          <div class="stat-label">DB RECORDS</div>
+          <div class="stat-val">84k</div>
+          <div class="stat-sub">total logged entries</div>
+        </div>
+        <div class="stat-card c-cyan">
+          <div class="stat-label">DB SIZE</div>
+          <div class="stat-val">18.4<span style="font-size:14px;"> MB</span></div>
+          <div class="stat-sub">aruba_monitor.db</div>
+        </div>
+        <div class="stat-card c-amber">
+          <div class="stat-label">POLL INTERVAL</div>
+          <div class="stat-val">60<span style="font-size:14px;">s</span></div>
+          <div class="stat-sub">AP + client endpoints</div>
+        </div>
+      </div>
+
+      <div class="two-col">
+
+        <!-- Credentials form -->
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-hdr"><div class="panel-title">// ARUBA CENTRAL CREDENTIALS</div></div>
+          <div class="panel-body">
+            <div class="form-group">
+              <label class="form-label">BASE URL</label>
+              <input class="form-input" value="https://apigw-prod2.central.arubanetworks.com" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">CLIENT ID</label>
+              <input class="form-input" value="aruba_monitor_prod_01" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">CLIENT SECRET</label>
+              <input class="form-input" type="password" value="supersecretvalue" />
+            </div>
+            <div class="form-group">
+              <label class="form-label">CUSTOMER ID</label>
+              <input class="form-input" value="cid_0092341" />
+            </div>
+            <div class="btn-row">
+              <button class="btn btn-primary">TEST CONNECTION</button>
+              <button class="btn">SAVE</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Polling toggles -->
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-hdr"><div class="panel-title">// POLLING SCHEDULE</div></div>
+          <div class="panel-body">
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="t-name">AP status polling</div>
+                <div class="t-desc">Fetch AP status and client counts</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" checked />
+                <div class="t-track"></div>
+                <div class="t-thumb"></div>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="t-name">Client log polling</div>
+                <div class="t-desc">Fetch connected wireless clients</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" checked />
+                <div class="t-track"></div>
+                <div class="t-thumb"></div>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="t-name">Offline AP alerts</div>
+                <div class="t-desc">Log + notify when AP drops</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" checked />
+                <div class="t-track"></div>
+                <div class="t-thumb"></div>
+              </label>
+            </div>
+            <div class="toggle-row">
+              <div class="toggle-info">
+                <div class="t-name">High load alerts</div>
+                <div class="t-desc">Flag AP when clients exceed 40</div>
+              </div>
+              <label class="toggle">
+                <input type="checkbox" />
+                <div class="t-track"></div>
+                <div class="t-thumb"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /view-config -->
+
+
+    <!-- ──────────────────────────────────────────────────────
+         VIEW 5 — POLL LOG
+         ────────────────────────────────────────────────────── -->
+    <div class="view" id="view-logs">
+
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">POLL LOG</div>
+          <div class="page-sub">Recent API requests · response times · errors</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-hdr"><div class="panel-title">// API REQUEST HISTORY</div></div>
+        <div class="tbl-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>TIMESTAMP</th>
+                <th>ENDPOINT</th>
+                <th>METHOD</th>
+                <th>RECORDS</th>
+                <th>DURATION</th>
+                <th>STATUS</th>
+              </tr>
+            </thead>
+            <tbody id="log-tbody">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /view-logs -->
+
+
+    <!-- ──────────────────────────────────────────────────────
+         VIEW 6 — DATABASE
+         ────────────────────────────────────────────────────── -->
+    <div class="view" id="view-database">
+
+      <div class="page-hdr">
+        <div>
+          <div class="page-title">DATABASE</div>
+          <div class="page-sub">SQLite · aruba_monitor.db · schema &amp; record counts</div>
+        </div>
+      </div>
+
+      <div class="stats stats-3">
+        <div class="stat-card c-cyan">
+          <div class="stat-label">AP LOG RECORDS</div>
+          <div class="stat-val">12,840</div>
+          <div class="stat-sub">~30 days retained</div>
+        </div>
+        <div class="stat-card c-green">
+          <div class="stat-label">CLIENT LOG RECORDS</div>
+          <div class="stat-val">71,391</div>
+          <div class="stat-sub">~30 days retained</div>
+        </div>
+        <div class="stat-card c-amber">
+          <div class="stat-label">DATABASE SIZE</div>
+          <div class="stat-val">18.4<span style="font-size:14px;"> MB</span></div>
+          <div class="stat-sub">Last vacuum: 3 days ago</div>
+        </div>
+      </div>
+
+      <div class="db-path">&#128193; /data/aruba_monitor.db</div>
+
+      <div class="two-col">
+
+        <!-- ap_log table -->
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-hdr"><div class="panel-title">// TABLE: ap_log</div></div>
+          <div class="panel-body">
+            <div class="schema-fields">
+              <span class="schema-chip">id</span>
+              <span class="schema-chip">ap_name</span>
+              <span class="schema-chip">status</span>
+              <span class="schema-chip">total_clients</span>
+              <span class="schema-chip">uptime_mins</span>
+              <span class="schema-chip">timestamp</span>
+            </div>
+            <table>
+              <thead><tr><th>COLUMN</th><th>TYPE</th><th>DESCRIPTION</th></tr></thead>
+              <tbody>
+                <tr><td class="mono" style="color:var(--green);">ap_name</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">AP identifier</td></tr>
+                <tr><td class="mono" style="color:var(--green);">status</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">Online / Offline</td></tr>
+                <tr><td class="mono" style="color:var(--green);">total_clients</td><td class="mono">INTEGER</td><td style="font-size:11px;color:var(--text1);">Connected count</td></tr>
+                <tr><td class="mono" style="color:var(--green);">uptime_mins</td><td class="mono">INTEGER</td><td style="font-size:11px;color:var(--text1);">AP uptime in minutes</td></tr>
+                <tr><td class="mono" style="color:var(--green);">timestamp</td><td class="mono">DATETIME</td><td style="font-size:11px;color:var(--text1);">UTC poll timestamp</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- client_log table -->
+        <div class="panel" style="margin-bottom:0;">
+          <div class="panel-hdr"><div class="panel-title">// TABLE: client_log</div></div>
+          <div class="panel-body">
+            <div class="schema-fields">
+              <span class="schema-chip">id</span>
+              <span class="schema-chip">ip_address</span>
+              <span class="schema-chip">hostname</span>
+              <span class="schema-chip">mac_address</span>
+              <span class="schema-chip">username</span>
+              <span class="schema-chip">access_role</span>
+              <span class="schema-chip">vendor</span>
+              <span class="schema-chip">model_os</span>
+              <span class="schema-chip">ap_name</span>
+              <span class="schema-chip">status</span>
+              <span class="schema-chip">timestamp</span>
+            </div>
+            <table>
+              <thead><tr><th>COLUMN</th><th>TYPE</th><th>DESCRIPTION</th></tr></thead>
+              <tbody>
+                <tr><td class="mono" style="color:var(--green);">ip_address</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">Client IP (DHCP)</td></tr>
+                <tr><td class="mono" style="color:var(--green);">hostname</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">Device hostname</td></tr>
+                <tr><td class="mono" style="color:var(--green);">mac_address</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">Hardware MAC</td></tr>
+                <tr><td class="mono" style="color:var(--green);">username</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">Authenticated user</td></tr>
+                <tr><td class="mono" style="color:var(--green);">access_role</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">Network policy role</td></tr>
+                <tr><td class="mono" style="color:var(--green);">vendor</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">NIC manufacturer</td></tr>
+                <tr><td class="mono" style="color:var(--green);">model_os</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">Device / OS</td></tr>
+                <tr><td class="mono" style="color:var(--green);">ap_name</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">FK → ap_log</td></tr>
+                <tr><td class="mono" style="color:var(--green);">status</td><td class="mono">TEXT</td><td style="font-size:11px;color:var(--text1);">Connected / Disconnected</td></tr>
+                <tr><td class="mono" style="color:var(--green);">timestamp</td><td class="mono">DATETIME</td><td style="font-size:11px;color:var(--text1);">UTC poll timestamp</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+    </div><!-- /view-database -->
+
+  </main>
+</div><!-- /shell -->
+
+
+<!-- ═══ AP DETAIL MODAL ════════════════════════════════════ -->
+<div class="modal-backdrop" id="ap-modal" onclick="if(event.target===this) closeModal();">
+  <div class="modal-box">
+    <div class="modal-hdr">
+      <div class="modal-title" id="modal-title">AP DETAIL</div>
+      <button class="modal-close" onclick="closeModal()">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="modal-fields"></div>
+      <div class="section-lbl mt-0">CONNECTED CLIENTS</div>
+      <table>
+        <thead>
+          <tr><th>HOSTNAME</th><th>IP</th><th>MAC</th><th>USERNAME</th><th>STATUS</th></tr>
+        </thead>
+        <tbody id="modal-clients"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══ JAVASCRIPT ════════════════════════════════════════ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+
+/* ── Sample data ─────────────────────────────────────────── */
+const APS = [
+  { name:'AP-101-Reception', loc:'Floor 1 · Lobby',        status:'online',  clients:34, max:50, uptime:'18h 42m', model:'AP-515', floor:1 },
+  { name:'AP-102-OpenPlan',  loc:'Floor 1 · Open Office',  status:'online',  clients:28, max:50, uptime:'18h 42m', model:'AP-515', floor:1 },
+  { name:'AP-103-Meeting',   loc:'Floor 1 · Meeting Rm A', status:'offline', clients:0,  max:50, uptime:'Down 5h 18m', model:'AP-305', floor:1 },
+  { name:'AP-104-Canteen',   loc:'Floor 1 · Canteen',      status:'online',  clients:22, max:50, uptime:'18h 42m', model:'AP-515', floor:1 },
+  { name:'AP-201-ConfRoom',  loc:'Floor 2 · Conference',   status:'online',  clients:19, max:50, uptime:'18h 42m', model:'AP-515', floor:2 },
+  { name:'AP-202-DevZone',   loc:'Floor 2 · Dev Area',     status:'warn',    clients:47, max:50, uptime:'18h 42m', model:'AP-635', floor:2 },
+  { name:'AP-203-Breakout',  loc:'Floor 2 · Breakout',     status:'online',  clients:12, max:50, uptime:'18h 42m', model:'AP-515', floor:2 },
+  { name:'AP-204-HotDesk',   loc:'Floor 2 · Hot Desks',    status:'online',  clients:9,  max:50, uptime:'18h 42m', model:'AP-515', floor:2 },
+  { name:'AP-301-Server',    loc:'Floor 3 · Server Room',  status:'offline', clients:0,  max:50, uptime:'Down 2h 05m', model:'AP-305', floor:3 },
+  { name:'AP-302-Exec',      loc:'Floor 3 · Exec Suite',   status:'online',  clients:8,  max:50, uptime:'18h 42m', model:'AP-635', floor:3 },
+  { name:'AP-303-Boardroom', loc:'Floor 3 · Boardroom',    status:'online',  clients:5,  max:50, uptime:'18h 42m', model:'AP-515', floor:3 },
+  { name:'AP-304-Training',  loc:'Floor 3 · Training Rm',  status:'offline', clients:0,  max:50, uptime:'Down 0h 31m', model:'AP-305', floor:3 },
+];
+
+const CLIENTS = [
+  { hostname:'SMITH-MBP',      ip:'10.1.4.87',  mac:'A4:CF:99:11:2E:BB', user:'j.smith',   ap:'AP-202-DevZone',   vendor:'Apple',     os:'macOS 14',   role:'Employee',  status:'connected',    time:'14:31' },
+  { hostname:'SMITH-IPHONE',   ip:'10.1.4.102', mac:'F8:4D:89:CC:41:07', user:'j.smith',   ap:'AP-202-DevZone',   vendor:'Apple',     os:'iOS 17',     role:'Employee',  status:'connected',    time:'14:29' },
+  { hostname:'JONES-DELL',     ip:'10.1.4.55',  mac:'D4:BE:D9:A2:01:F3', user:'k.jones',   ap:'AP-202-DevZone',   vendor:'Dell',      os:'Windows 11', role:'Employee',  status:'connected',    time:'09:02' },
+  { hostname:'RECEPTION-PC',   ip:'10.1.2.10',  mac:'00:1A:2B:3C:4D:5E', user:'reception', ap:'AP-101-Reception', vendor:'HP',        os:'Windows 10', role:'Kiosk',     status:'connected',    time:'08:01' },
+  { hostname:'GUEST-SAMSUNG',  ip:'10.1.9.14',  mac:'EC:9B:F3:88:12:DD', user:'guest_01',  ap:'AP-101-Reception', vendor:'Samsung',   os:'Android 14', role:'Guest',     status:'connected',    time:'13:45' },
+  { hostname:'SMITH-MBP',      ip:'10.1.2.14',  mac:'A4:CF:99:11:2E:BB', user:'j.smith',   ap:'AP-101-Reception', vendor:'Apple',     os:'macOS 14',   role:'Employee',  status:'disconnected', time:'11:04' },
+  { hostname:'TAYLOR-MBP',     ip:'10.1.3.88',  mac:'3C:22:FB:D1:09:AA', user:'s.taylor',  ap:'AP-201-ConfRoom',  vendor:'Apple',     os:'macOS 14',   role:'Employee',  status:'connected',    time:'14:00' },
+  { hostname:'BROWN-THINKPAD', ip:'10.1.4.31',  mac:'54:EE:75:C3:7B:12', user:'t.brown',   ap:'AP-202-DevZone',   vendor:'Lenovo',    os:'Windows 11', role:'Employee',  status:'connected',    time:'08:55' },
+  { hostname:'SMITH-MBP',      ip:'10.1.3.45',  mac:'A4:CF:99:11:2E:BB', user:'j.smith',   ap:'AP-201-ConfRoom',  vendor:'Apple',     os:'macOS 14',   role:'Employee',  status:'disconnected', time:'13:58' },
+  { hostname:'EXEC-IPAD',      ip:'10.1.5.20',  mac:'BC:9F:EF:44:2A:01', user:'ceo',       ap:'AP-302-Exec',      vendor:'Apple',     os:'iPadOS 17',  role:'Executive', status:'connected',    time:'11:30' },
+  { hostname:'DAVIS-SURFACE',  ip:'10.1.3.72',  mac:'70:BC:10:2E:88:F5', user:'m.davis',   ap:'AP-203-Breakout',  vendor:'Microsoft', os:'Windows 11', role:'Employee',  status:'connected',    time:'12:15' },
+  { hostname:'SMITH-MBP',      ip:'10.1.3.12',  mac:'A4:CF:99:11:2E:BB', user:'j.smith',   ap:'AP-201-ConfRoom',  vendor:'Apple',     os:'macOS 14',   role:'Employee',  status:'disconnected', time:'12:48' },
+];
+
+const HOURS    = ['06','07','08','09','10','11','12','13','14','15','16','17','18'];
+const AP_DATA  = [
+  [3,8,24,34,30,28,18,22,25,28,20,14,8],   /* Reception  */
+  [2,5,14,20,24,28,22,20,22,24,18,12,6],   /* OpenPlan   */
+  [2,4,10,18,28,35,38,47,42,38,30,22,10],  /* DevZone    */
+  [0,0, 2, 5, 8,12,10, 8,19,15,10, 5,2],  /* ConfRoom   */
+];
+const AP_COLORS = ['#22c55e','#f59e0b','#06b6d4','#a855f7'];
+
+const POLL_LOGS = [
+  { time:'14:32:07', ep:'/monitoring/v1/aps',     method:'GET',  records:24,  dur:'142ms', code:'200',      cls:'log-ok'   },
+  { time:'14:32:08', ep:'/monitoring/v1/clients', method:'GET',  records:186, dur:'218ms', code:'200',      cls:'log-ok'   },
+  { time:'14:31:07', ep:'/monitoring/v1/aps',     method:'GET',  records:24,  dur:'138ms', code:'200',      cls:'log-ok'   },
+  { time:'14:31:08', ep:'/monitoring/v1/clients', method:'GET',  records:184, dur:'201ms', code:'200',      cls:'log-ok'   },
+  { time:'14:30:07', ep:'/monitoring/v1/aps',     method:'GET',  records:24,  dur:'398ms', code:'200 SLOW', cls:'log-warn' },
+  { time:'09:13:44', ep:'/monitoring/v1/aps',     method:'GET',  records:0,   dur:'—',     code:'503 ERR',  cls:'log-err'  },
+  { time:'09:13:44', ep:'/auth/v1/oauth2/token',  method:'POST', records:0,   dur:'94ms',  code:'200',      cls:'log-ok'   },
+];
+
+/* ── Clock & countdown ───────────────────────────────────── */
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clock').textContent = n.toTimeString().slice(0, 8);
+  document.getElementById('last-poll').textContent = n.toTimeString().slice(0, 8);
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+let cd = 60;
+setInterval(() => {
+  cd = cd > 0 ? cd - 1 : 60;
+  document.getElementById('countdown').textContent = cd;
+}, 1000);
+
+function triggerRefresh() { cd = 60; }
+
+/* ── Navigation ──────────────────────────────────────────── */
+function showView(name, el) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'analytics') initCharts();
+}
+
+/* ── AP Table ────────────────────────────────────────────── */
+let apFilter = 'all';
+let apSearch  = '';
+
+function renderAPs() {
+  const tbody = document.getElementById('ap-tbody');
+  const rows  = APS.filter(ap => {
+    const fOk = apFilter === 'all' || ap.status === apFilter;
+    const sOk = !apSearch ||
+                ap.name.toLowerCase().includes(apSearch) ||
+                ap.loc.toLowerCase().includes(apSearch);
+    return fOk && sOk;
+  });
+
+  tbody.innerHTML = rows.map(ap => {
+    const pct   = Math.round((ap.clients / ap.max) * 100);
+    const lc    = pct > 80 ? 'high' : pct > 55 ? 'med' : 'low';
+    const label = ap.status === 'warn' ? 'High load' : ap.status;
+    return `
+      <tr onclick="openAPModal(${JSON.stringify(ap).replace(/"/g, '&quot;')})">
+        <td><span class="dot ${ap.status}"></span></td>
+        <td>
+          <div class="cell-name">${ap.name}</div>
+          <div class="cell-sub">${ap.loc}</div>
+        </td>
+        <td><span class="pill ${ap.status}">${label.toUpperCase()}</span></td>
+        <td class="mono-green" style="font-size:14px;">${ap.clients || '—'}</td>
+        <td>
+          ${ap.status !== 'offline'
+            ? `<div class="load-bar"><div class="load-fill ${lc}" style="width:${pct}%"></div></div>`
+            : '—'}
+        </td>
+        <td class="mono" style="color:${ap.status === 'offline' ? 'var(--red)' : 'var(--text1)'};">${ap.uptime}</td>
+        <td class="mono" style="color:var(--text2);">${ap.model}</td>
+      </tr>`;
+  }).join('');
+}
+renderAPs();
+
+function filterAP(f, el) {
+  apFilter = f;
+  document.querySelectorAll('#view-status .filter-chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  renderAPs();
+}
+
+function searchAPs(v) {
+  apSearch = v.toLowerCase();
+  renderAPs();
+}
+
+/* ── AP Modal ────────────────────────────────────────────── */
+function openAPModal(ap) {
+  document.getElementById('modal-title').textContent = ap.name;
+
+  const fields = [
+    { l:'Location', v: ap.loc },
+    { l:'Status',   v: ap.status.toUpperCase(), cls: ap.status === 'online' ? 'green' : ap.status === 'warn' ? 'amber' : 'red' },
+    { l:'Clients',  v: ap.clients, cls:'cyan' },
+    { l:'Uptime',   v: ap.uptime },
+    { l:'Model',    v: ap.model },
+    { l:'Floor',    v: 'Floor ' + ap.floor },
+  ];
+
+  document.getElementById('modal-fields').innerHTML = fields.map(f =>
+    `<div class="detail-field">
+       <div class="df-label">${f.l}</div>
+       <div class="df-val ${f.cls || ''}">${f.v}</div>
+     </div>`
+  ).join('');
+
+  const myClients = CLIENTS.filter(c => c.ap === ap.name).slice(0, 6);
+  document.getElementById('modal-clients').innerHTML = myClients.length
+    ? myClients.map(c => `
+        <tr>
+          <td class="mono">${c.hostname}</td>
+          <td class="mono-cyan">${c.ip}</td>
+          <td class="mono">${c.mac}</td>
+          <td class="mono" style="color:var(--text1);">${c.user}</td>
+          <td><span class="pill ${c.status === 'connected' ? 'online' : 'offline'}">${c.status.toUpperCase()}</span></td>
+        </tr>`).join('')
+    : `<tr><td colspan="5" style="text-align:center;padding:16px;color:var(--text2);">No clients on this AP</td></tr>`;
+
+  document.getElementById('ap-modal').classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('ap-modal').classList.remove('open');
+}
+
+/* ── Analytics charts ────────────────────────────────────── */
+let lineChart = null;
+let barChart  = null;
+
+function initCharts() {
+  if (lineChart) return;
+
+  const chartDefaults = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#202020',
+        borderColor: '#333',
+        borderWidth: 1,
+        titleColor: '#22c55e',
+        bodyColor: '#888',
+        padding: 9,
+        cornerRadius: 3,
+      }
+    },
+    scales: {
+      x: {
+        grid: { color: 'rgba(255,255,255,0.04)' },
+        ticks: { color: '#444', font: { family: 'Courier New', size: 10 } }
+      },
+      y: {
+        grid: { color: 'rgba(255,255,255,0.04)' },
+        ticks: { color: '#444', font: { family: 'Courier New', size: 10 } }
+      }
+    }
+  };
+
+  const i1 = parseInt(document.getElementById('ap-sel-1').value);
+  const i2 = parseInt(document.getElementById('ap-sel-2').value);
+
+  lineChart = new Chart(document.getElementById('lineChart'), {
+    type: 'line',
+    data: {
+      labels: HOURS.map(h => h + ':00'),
+      datasets: [
+        {
+          label: 'AP 1', data: AP_DATA[i1],
+          borderColor: AP_COLORS[i1], backgroundColor: AP_COLORS[i1] + '22',
+          fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2,
+        },
+        {
+          label: 'AP 2', data: AP_DATA[i2],
+          borderColor: AP_COLORS[i2], backgroundColor: AP_COLORS[i2] + '18',
+          fill: true, tension: 0.4, pointRadius: 3, borderWidth: 2,
+        },
+      ]
+    },
+    options: { ...chartDefaults, interaction: { mode: 'index', intersect: false } }
+  });
+
+  const totals = HOURS.map((_, i) => AP_DATA.reduce((s, d) => s + (d[i] || 0), 0));
+  const maxT   = Math.max(...totals);
+
+  barChart = new Chart(document.getElementById('barChart'), {
+    type: 'bar',
+    data: {
+      labels: HOURS.map(h => h + ':00'),
+      datasets: [{
+        data: totals,
+        backgroundColor: totals.map(v => v === maxT ? '#f59e0b' : 'rgba(34,197,94,0.18)'),
+        borderColor:     totals.map(v => v === maxT ? '#f59e0b' : '#22c55e'),
+        borderWidth: 1,
+        borderRadius: 2,
+      }]
+    },
+    options: chartDefaults
+  });
+
+  /* Rank list */
+  const ranked = [...APS]
+    .filter(a => a.status !== 'offline')
+    .sort((a, b) => b.clients - a.clients)
+    .slice(0, 6);
+  const maxC = ranked[0].clients;
+
+  document.getElementById('rank-list').innerHTML = ranked.map((ap, i) => `
+    <div class="rank-row">
+      <div class="rank-n">#${i + 1}</div>
+      <div class="rank-name">${ap.name.replace('AP-', '')}</div>
+      <div class="rank-bg"><div class="rank-fg" style="width:${Math.round(ap.clients / maxC * 100)}%"></div></div>
+      <div class="rank-val">${ap.clients}</div>
+    </div>`).join('');
+}
+
+function updateLineChart() {
+  if (!lineChart) return;
+  const i1 = parseInt(document.getElementById('ap-sel-1').value);
+  const i2 = parseInt(document.getElementById('ap-sel-2').value);
+  lineChart.data.datasets[0].data             = AP_DATA[i1];
+  lineChart.data.datasets[0].borderColor      = AP_COLORS[i1];
+  lineChart.data.datasets[0].backgroundColor  = AP_COLORS[i1] + '22';
+  lineChart.data.datasets[1].data             = AP_DATA[i2];
+  lineChart.data.datasets[1].borderColor      = AP_COLORS[i2];
+  lineChart.data.datasets[1].backgroundColor  = AP_COLORS[i2] + '18';
+  lineChart.update();
+}
+
+/* ── Client log ──────────────────────────────────────────── */
+const apFilterSel = document.getElementById('ap-filter-sel');
+[...new Set(CLIENTS.map(c => c.ap))].forEach(ap => {
+  const o = document.createElement('option');
+  o.value = ap; o.textContent = ap;
+  apFilterSel.appendChild(o);
+});
+
+let cf = { status: 'all', ap: 'all', search: '' };
+
+function renderClients() {
+  const rows = CLIENTS.filter(c => {
+    const ms = cf.status === 'all' || c.status === cf.status;
+    const ma = cf.ap === 'all'     || c.ap === cf.ap;
+    const mq = !cf.search || Object.values(c).some(v =>
+      String(v).toLowerCase().includes(cf.search)
+    );
+    return ms && ma && mq;
+  });
+
+  document.getElementById('client-count').textContent = rows.length + ' entries';
+  document.getElementById('client-tbody').innerHTML = rows.map(c => `
+    <tr onclick="showTrail('${c.mac}')">
+      <td><span class="dot ${c.status === 'connected' ? 'online' : 'offline'}" style="width:7px;height:7px;"></span></td>
+      <td class="cell-name">${c.hostname}</td>
+      <td class="mono-cyan">${c.ip}</td>
+      <td class="mono">${c.mac}</td>
+      <td class="mono" style="color:var(--text1);">${c.user}</td>
+      <td class="mono" style="color:var(--green);">${c.ap}</td>
+      <td class="mono" style="color:var(--text1);">${c.vendor} · ${c.os}</td>
+      <td><span class="pill ${c.status === 'connected' ? 'online' : 'offline'}">${c.status.toUpperCase()}</span></td>
+      <td class="mono">${c.time}</td>
+    </tr>`).join('');
+}
+renderClients();
+
+function searchClients(v) { cf.search = v.toLowerCase(); renderClients(); }
+function filterClientStatus(v) { cf.status = v; renderClients(); }
+function filterClientAP(v) { cf.ap = v; renderClients(); }
+
+function showTrail(mac) {
+  const history = CLIENTS.filter(c => c.mac === mac);
+  if (!history.length) return;
+  const dev = history[0];
+
+  document.getElementById('trail-title').textContent =
+    '// DEVICE TRAIL: ' + dev.hostname + ' · ' + mac;
+
+  document.getElementById('trail-device-info').innerHTML = [
+    { l:'Hostname',   v: dev.hostname },
+    { l:'MAC',        v: mac },
+    { l:'Username',   v: dev.user },
+    { l:'Vendor / OS',v: dev.vendor + ' · ' + dev.os },
+    { l:'Role',       v: dev.role },
+    { l:'Events today', v: history.length },
+  ].map(f =>
+    `<div class="detail-field">
+       <div class="df-label">${f.l}</div>
+       <div class="df-val" style="font-size:11px;">${f.v}</div>
+     </div>`
+  ).join('');
+
+  document.getElementById('trail-timeline').innerHTML = history.map((c, i) => `
+    <div class="tl-row">
+      <div class="tl-spine">
+        <div class="tl-dot ${c.status === 'connected' ? 'on' : 'off'}"></div>
+        ${i < history.length - 1 ? '<div class="tl-line"></div>' : ''}
+      </div>
+      <div class="tl-time">${c.time}</div>
+      <div>
+        <div class="tl-ap">${c.ap}</div>
+        <div class="tl-ev">${c.status === 'connected' ? 'Connected' : 'Disconnected'} · ${c.ip}</div>
+      </div>
+    </div>`).join('');
+
+  const panel = document.getElementById('trail-panel');
+  panel.style.display = 'block';
+  panel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function closeTrail() {
+  document.getElementById('trail-panel').style.display = 'none';
+}
+
+/* ── Poll log table ──────────────────────────────────────── */
+document.getElementById('log-tbody').innerHTML = POLL_LOGS.map(l => `
+  <tr>
+    <td class="mono">${l.time}</td>
+    <td class="mono-cyan">${l.ep}</td>
+    <td class="mono">${l.method}</td>
+    <td class="mono">${l.records || '—'}</td>
+    <td class="mono">${l.dur}</td>
+    <td><span class="${l.cls}">${l.code}</span></td>
+  </tr>`).join('');
+
+</script>
+</body>
+</html>

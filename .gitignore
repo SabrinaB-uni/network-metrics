@@ -1,0 +1,21 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Our SQLite database file (data, not code — don't commit it)
+*.db
+*.sqlite
+*.sqlite3
+
+# Secrets / config (we'll add this in a later lesson)
+.env
+
+# IDE
+.idea/
+
+# Log files
+*.log
