@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Database{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Database</h1>
+    <div class="page-sub mono">{{ overview.path }}</div>
+  </div>
+</div>
+
+<div class="kpi-row">
+  {% for t in overview.tables %}
+  <div class="kpi kpi--total">
+    <div class="kpi-label">{{ t.name }}</div>
+    <div class="kpi-value">{{ t.rows }}</div>
+    <div class="kpi-sub">rows</div>
+  </div>
+  {% endfor %}
+  <div class="kpi kpi--clients">
+    <div class="kpi-label">DB size</div>
+    <div class="kpi-value" style="font-size:22px; line-height:2.1">{{ overview.size_bytes|bytes }}</div>
+    <div class="kpi-sub">on disk</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Table preview — newest rows</div>
+    <div class="seg">
+      <a href="{{ url_for('database', table='ap_log') }}" class="{{ 'active' if table=='ap_log' }}">ap_log</a>
+      <a href="{{ url_for('database', table='client_log') }}" class="{{ 'active' if table=='client_log' }}">client_log</a>
+      <a href="{{ url_for('database', table='poll_log') }}" class="{{ 'active' if table=='poll_log' }}">poll_log</a>
+    </div>
+  </div>
+  <div class="panel-body flush">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr>{% for c in columns %}<th>{{ c }}</th>{% endfor %}</tr></thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>{% for c in columns %}<td class="mono dim">{{ r[c] }}</td>{% endfor %}</tr>
+          {% else %}
+          <tr><td class="empty">No rows.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,55 +1,244 @@
 """
-network-metrics — Aruba wireless monitoring
-Lesson 1: the smallest possible Flask web app.
+NetWatch — Aruba Central monitoring dashboard (Flask).
 
-Run it with:   python app.py
-Then open:      http://127.0.0.1:5000
+Six sections:
+  /            AP Status      — current access points, KPIs, search/filter
+  /analytics   Analytics      — clients over the day + busiest APs
+  /clients     Client Log     — search the client history, track a device
+  /api-config  API Config     — data source + Aruba connection status
+  /poll-log    Poll Log       — audit trail of every poll run
+  /database    Database       — table row counts + recent-row preview
+
+Data is read from SQLite (populated by poller.py / seed_demo.py).
 """
+import csv
+import io
+from datetime import datetime
 
-# 1) Import the Flask class from the flask package we installed.
-from flask import Flask
+from flask import Flask, render_template, request, redirect, url_for, Response
 
-# 2) Create THE application object. __name__ tells Flask where it lives
-#    (so it can find templates/static files later). You'll see "app" again
-#    and again — it's the heart of every Flask program.
+import config
+import db
+import charts
+from aruba.client import get_client
+
 app = Flask(__name__)
-'''Write ap_summary(name, count) that returns the string AP Library-North has 
-23 clients, call it with ap_summary("Library-North", 23), print the result, and run it.
- Paste me your attempt + any output or error 
-— broken is fine — and I'll critique it before showing a clean version.'''
+db.init_db()
+
+# Sidebar structure: (section title, [(endpoint, label, glyph), ...])
+NAV = [
+    ("Monitoring", [
+        ("ap_status", "AP Status", "▦"),
+        ("analytics", "Analytics", "◍"),
+        ("client_log", "Client Log", "◉"),
+    ]),
+    ("System", [
+        ("api_config", "API Config", "⚙"),
+        ("poll_log", "Poll Log", "≣"),
+    ]),
+    ("Data", [
+        ("database", "Database", "◫"),
+    ]),
+]
 
 
+# --------------------------------------------------------------------------
+# Template helpers
+# --------------------------------------------------------------------------
+@app.template_filter("uptime")
+def format_uptime(secs):
+    secs = int(secs or 0)
+    if secs <= 0:
+        return "—"
+    days, rem = divmod(secs, 86400)
+    hours, rem = divmod(rem, 3600)
+    mins = rem // 60
+    if days:
+        return f"{days}d {hours}h"
+    return f"{hours}h {mins}m"
 
-# 3) A "route" connects a URL to a Python function.
-#    The @app.route("/") line means: when someone visits the home page "/",
-#    run the function directly below it and send back whatever it returns.
+
+@app.template_filter("ago")
+def time_ago(ts):
+    if not ts:
+        return "—"
+    try:
+        t = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return ts
+    secs = int((datetime.now() - t).total_seconds())
+    if secs < 60:
+        return f"{secs}s ago"
+    if secs < 3600:
+        return f"{secs // 60}m ago"
+    if secs < 86400:
+        return f"{secs // 3600}h ago"
+    return f"{secs // 86400}d ago"
+
+
+@app.template_filter("clock")
+def clock(ts):
+    if not ts:
+        return "—"
+    try:
+        return datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").strftime("%H:%M:%S")
+    except ValueError:
+        return ts
+
+
+@app.template_filter("bytes")
+def fmt_bytes(n):
+    n = float(n or 0)
+    for unit in ("B", "KB", "MB", "GB"):
+        if n < 1024 or unit == "GB":
+            return f"{n:.0f} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+
+
+def _annotate(aps):
+    for a in aps:
+        high = a["load_pct"] >= 85
+        a["alert"] = a["status"] == "Offline" or high
+        a["load_class"] = "high" if high else ("warn" if a["load_pct"] >= 60 else "ok")
+    return aps
+
+
+@app.context_processor
+def inject_globals():
+    k = db.kpis()
+    failed = sum(1 for p in db.recent_poll_log(120) if not p["success"])
+    badges = {
+        "ap_status": k["offline"] or None,
+        "poll_log": failed or None,
+        "database": "OK",
+    }
+    return {
+        "APP_NAME": config.APP_NAME,
+        "APP_TAGLINE": config.APP_TAGLINE,
+        "data_source": config.data_source_label(),
+        "use_mock": config.USE_MOCK,
+        "poll_interval": config.POLL_INTERVAL,
+        "net_health": k["availability"],
+        "last_polled": db.latest_snapshot_ts(),
+        "nav": NAV,
+        "badges": badges,
+        "server_time": datetime.now().strftime("%H:%M:%S"),
+    }
+
+
+# --------------------------------------------------------------------------
+# Routes
+# --------------------------------------------------------------------------
 @app.route("/")
-def home():
-    return "<h1>network-metrics is alive</h1><p>Lesson 1 complete.</p>"
+def ap_status():
+    q = request.args.get("q", "").strip()
+    flt = request.args.get("filter", "all")
+    aps = _annotate(db.latest_aps())
+
+    if q:
+        ql = q.lower()
+        aps = [a for a in aps
+               if ql in (a["ap_name"] or "").lower()
+               or ql in (a["location"] or "").lower()]
+    if flt == "online":
+        aps = [a for a in aps if a["status"] == "Online"]
+    elif flt == "offline":
+        aps = [a for a in aps if a["status"] == "Offline"]
+    elif flt == "alerts":
+        aps = [a for a in aps if a["alert"]]
+
+    return render_template("ap_status.html", active="ap_status",
+                           aps=aps, kpi=db.kpis(), q=q, flt=flt)
 
 
-# 4) A second route, just to prove routing works. Visit /ping in the browser.
-@app.route("/ping")
-def ping():
-    return "pong"
-#Exercise 1.1b — cement it before we move on
-#Same skill, new data, so the parameter idea sticks. Write:
+@app.route("/analytics")
+def analytics():
+    ts = db.clients_timeseries()
+    values = [p["clients"] for p in ts]
+    labels = [clock(p["t"]) for p in ts]
+    popularity = db.ap_popularity()
 
-#A function client_summary(hostname, ip)
-#It returns (not prints) the string: Host laptop-42 is connected from 10.0.0.5
-#Then print(client_summary("laptop-42", "10.0.0.5"))
-#Rules to prove you got the lesson: don't reassign hostname or ip inside, and use an f-string. Run it, paste me the code + output. Once that's clean, Lesson 1.2 is return vs print properly — which your Trap 3 sets up perfectly.
+    line = charts.line_chart(values, labels)
+    bars = charts.bar_chart(
+        [{"label": p["ap_name"], "sub": p["location"], "value": int(round(p["avg_c"]))}
+         for p in popularity[:15]]
+    )
+    stats = {
+        "peak": max(values) if values else 0,
+        "now": values[-1] if values else 0,
+        "busiest": popularity[0]["ap_name"] if popularity else "—",
+        "samples": len(values),
+    }
+    return render_template("analytics.html", active="analytics",
+                           line=line, bars=bars, stats=stats)
 
 
-def client_summary(hostname, ip):
-    return f"Host {hostname} is connected from {ip}"
+@app.route("/clients")
+def client_log():
+    q = request.args.get("q", "").strip()
+    mac = request.args.get("mac", "").strip()
+    clients = db.search_clients(q)
+    history = db.client_ap_history(mac) if mac else None
+    return render_template("client_log.html", active="client_log",
+                           clients=clients, q=q, mac=mac, history=history)
 
-print(client_summary("laptop-42", "10.0.0.5"))
+
+@app.route("/api-config")
+def api_config():
+    test = None
+    if request.args.get("test") == "1":
+        test = get_client().test_connection()  # (ok, message)
+    cfg = {
+        "base_url": config.ARUBA_BASE_URL or "(not set)",
+        "client_id_set": bool(config.ARUBA_CLIENT_ID),
+        "client_secret_set": bool(config.ARUBA_CLIENT_SECRET),
+        "access_token_set": bool(config.ARUBA_ACCESS_TOKEN),
+        "refresh_token_set": bool(config.ARUBA_REFRESH_TOKEN),
+    }
+    return render_template("api_config.html", active="api_config",
+                           cfg=cfg, test=test)
 
 
+@app.route("/poll-log")
+def poll_log():
+    return render_template("poll_log.html", active="poll_log",
+                           polls=db.recent_poll_log(150))
 
-# 5) This block only runs when you launch the file directly
-#    (python app.py), not when it's imported. debug=True auto-reloads
-#    the server whenever you save a change — handy while learning.
+
+@app.route("/database")
+def database():
+    table = request.args.get("table", "ap_log")
+    columns, rows = db.recent_rows(table)
+    return render_template("database.html", active="database",
+                           overview=db.db_overview(), table=table,
+                           columns=columns, rows=rows)
+
+
+@app.route("/export/aps.csv")
+def export_aps():
+    aps = db.latest_aps()
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["ap_name", "location", "floor", "status", "total_clients",
+                     "load_pct", "uptime_secs", "model", "timestamp"])
+    for a in aps:
+        writer.writerow([a["ap_name"], a["location"], a["floor"], a["status"],
+                         a["total_clients"], a["load_pct"], a["uptime_secs"],
+                         a["model"], a["timestamp"]])
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=ap_status.csv"},
+    )
+
+
+@app.route("/refresh", methods=["POST"])
+def refresh():
+    """Trigger a single immediate poll, then return to the previous page."""
+    from poller import poll_once
+    poll_once()
+    return redirect(request.referrer or url_for("ap_status"))
+
+
 if __name__ == "__main__":
     app.run(debug=True)

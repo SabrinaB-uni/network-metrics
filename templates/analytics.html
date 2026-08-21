@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Analytics{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Wireless Analytics</h1>
+    <div class="page-sub">Connected clients across the day · busiest access points</div>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi kpi--clients">
+    <div class="kpi-label">Peak clients today</div>
+    <div class="kpi-value">{{ stats.peak }}</div>
+    <div class="kpi-sub">busiest moment</div>
+  </div>
+  <div class="kpi kpi--total">
+    <div class="kpi-label">Clients now</div>
+    <div class="kpi-value">{{ stats.now }}</div>
+    <div class="kpi-sub">latest sample</div>
+  </div>
+  <div class="kpi kpi--online">
+    <div class="kpi-label">Busiest AP</div>
+    <div class="kpi-value" style="font-size:17px; line-height:1.9">{{ stats.busiest }}</div>
+    <div class="kpi-sub">highest average load</div>
+  </div>
+  <div class="kpi">
+    <div class="kpi-label">Samples today</div>
+    <div class="kpi-value">{{ stats.samples }}</div>
+    <div class="kpi-sub">polls recorded</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Connected clients over the day</div></div>
+  <div class="panel-body">{{ line|safe }}</div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Busiest access points — average clients</div></div>
+  <div class="panel-body">{{ bars|safe }}</div>
+</div>
+{% endblock %}
