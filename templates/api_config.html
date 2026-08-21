@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}API Config{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">API Configuration</h1>
+    <div class="page-sub">Aruba Central connection &amp; data source</div>
+  </div>
+  <a class="btn" href="{{ url_for('api_config', test='1') }}">⚡ Test connection</a>
+</div>
+
+{% if test %}
+<div class="note {{ 'ok' if test[0] else 'bad' }}" style="margin-bottom:20px">
+  {{ '✓' if test[0] else '✕' }} {{ test[1] }}
+</div>
+{% endif %}
+
+<div class="grid-2">
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Data source</div></div>
+    <div class="panel-body">
+      <div class="kv">
+        <span class="k">Active source</span>
+        <span class="v">
+          {% if use_mock %}<span class="pill amber">MOCK DATA</span>
+          {% else %}<span class="pill green">LIVE API</span>{% endif %}
+        </span>
+      </div>
+      <div class="kv"><span class="k">Poll interval</span><span class="v">{{ poll_interval }}s</span></div>
+      <div class="kv"><span class="k">Last poll</span><span class="v">{{ last_polled|clock }} · {{ last_polled|ago }}</span></div>
+      <p class="note" style="margin-top:14px">
+        Switch sources by setting <span class="mono">USE_MOCK</span> in
+        <span class="mono">.env</span>, then restart the app.
+      </p>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><div class="panel-title">Aruba Central credentials</div></div>
+    <div class="panel-body">
+      <div class="kv"><span class="k">Base URL</span><span class="v">{{ cfg.base_url }}</span></div>
+      <div class="kv"><span class="k">Client ID</span>
+        <span class="v">{% if cfg.client_id_set %}<span class="pill green">set</span>{% else %}<span class="pill red">missing</span>{% endif %}</span></div>
+      <div class="kv"><span class="k">Client secret</span>
+        <span class="v">{% if cfg.client_secret_set %}<span class="pill green">set</span>{% else %}<span class="pill red">missing</span>{% endif %}</span></div>
+      <div class="kv"><span class="k">Access token</span>
+        <span class="v">{% if cfg.access_token_set %}<span class="pill green">set</span>{% else %}<span class="pill red">missing</span>{% endif %}</span></div>
+      <div class="kv"><span class="k">Refresh token</span>
+        <span class="v">{% if cfg.refresh_token_set %}<span class="pill green">set</span>{% else %}<span class="pill red">missing</span>{% endif %}</span></div>
+      <p class="note" style="margin-top:14px">
+        Secrets are read from <span class="mono">.env</span> and are never displayed or logged.
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ APP_NAME }} — {% block title %}{{ APP_TAGLINE }}{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand">
+      <span class="brand-mark">◮</span>
+      <span class="brand-text">
+        <span class="brand-name">{{ APP_NAME }}</span>
+        <span class="brand-sub">{{ APP_TAGLINE }}</span>
+      </span>
+    </div>
+
+    <nav class="nav">
+      {% for section, items in nav %}
+        <div class="nav-section">{{ section }}</div>
+        {% for endpoint, label, glyph in items %}
+          <a class="nav-item {{ 'active' if active == endpoint }}" href="{{ url_for(endpoint) }}">
+            <span class="glyph">{{ glyph }}</span>
+            <span class="nav-label">{{ label }}</span>
+            {% if badges.get(endpoint) %}
+              <span class="nav-badge {{ 'ok' if endpoint == 'database' }}">{{ badges[endpoint] }}</span>
+            {% endif %}
+          </a>
+        {% endfor %}
+      {% endfor %}
+    </nav>
+
+    <div class="sidebar-foot">
+      <span class="src-pill {{ 'live' if not use_mock }}">{{ 'MOCK DATA' if use_mock else 'LIVE API' }}</span>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="live"><span class="live-dot"></span>Live</span>
+        <span class="clock" id="clock">{{ server_time }}</span>
+        <span class="next-poll">next poll in
+          <span id="next-poll" data-interval="{{ poll_interval }}">–</span>
+        </span>
+      </div>
+      <div class="topbar-right">
+        <div class="health" title="Share of access points online">
+          <span class="health-label">Network health</span>
+          <span class="health-track"><span class="health-fill" style="width: {{ net_health }}%"></span></span>
+          <span class="health-val">{{ net_health }}%</span>
+        </div>
+        <button class="btn icon-btn" id="theme-toggle" type="button" title="Toggle day / night">◐</button>
+        <form method="post" action="{{ url_for('refresh') }}" class="inline-form">
+          <button class="btn" type="submit">⟳ Refresh</button>
+        </form>
+      </div>
+    </header>
+
+    <div class="content">
+      {% block content %}{% endblock %}
+    </div>
+  </main>
+</div>
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

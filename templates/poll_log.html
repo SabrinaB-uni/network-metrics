@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Poll Log{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Poll Log</h1>
+    <div class="page-sub">Audit trail of every polling run</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Recent polls ({{ polls|length }})</div></div>
+  <div class="panel-body flush">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th>Time</th><th>Source</th><th>APs</th><th>Clients</th>
+              <th>Duration</th><th>Result</th><th>Message</th></tr>
+        </thead>
+        <tbody>
+          {% for p in polls %}
+          <tr>
+            <td class="mono dim">{{ p.timestamp }}</td>
+            <td><span class="pill {{ 'green' if p.source == 'live' else 'amber' }}">{{ p.source }}</span></td>
+            <td class="num">{{ p.ap_count }}</td>
+            <td class="num">{{ p.client_count }}</td>
+            <td class="num dim">{{ p.duration_ms }} ms</td>
+            <td>{% if p.success %}<span class="pill green">OK</span>{% else %}<span class="pill red">FAIL</span>{% endif %}</td>
+            <td class="dim">{{ p.message }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="7" class="empty">No polls recorded yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
