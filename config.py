@@ -24,8 +24,8 @@ ARUBA_ACCESS_TOKEN = os.getenv("ARUBA_ACCESS_TOKEN", "")
 ARUBA_REFRESH_TOKEN = os.getenv("ARUBA_REFRESH_TOKEN", "")
 ARUBA_CUSTOMER_ID = os.getenv("ARUBA_CUSTOMER_ID", "")
 
-APP_NAME = "NetWatch"
-APP_TAGLINE = "Aruba Central Monitor"
+APP_NAME = "network metrics"
+APP_TAGLINE = "Aruba Central monitor"
 
 
 def data_source_label():

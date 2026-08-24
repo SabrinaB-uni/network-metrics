@@ -1,43 +1,36 @@
-// NetWatch — theme toggle, live clock, poll countdown. Vanilla JS, no deps.
 (function () {
   var root = document.documentElement;
-
-  // --- Theme (persisted) ---------------------------------------------
-  var saved = localStorage.getItem("netwatch-theme");
-  if (saved) root.setAttribute("data-theme", saved);
   var toggle = document.getElementById("theme-toggle");
+
+  function label() {
+    if (toggle) {
+      toggle.textContent = root.getAttribute("data-theme") === "dark" ? "Light" : "Dark";
+    }
+  }
+
+  var saved = localStorage.getItem("theme");
+  if (saved) root.setAttribute("data-theme", saved);
+  label();
+
   if (toggle) {
     toggle.addEventListener("click", function () {
       var next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
       root.setAttribute("data-theme", next);
-      localStorage.setItem("netwatch-theme", next);
+      localStorage.setItem("theme", next);
+      label();
     });
   }
 
-  // --- Live clock ----------------------------------------------------
-  var clockEl = document.getElementById("clock");
-  function tick() {
-    if (clockEl) {
-      clockEl.textContent = new Date().toLocaleTimeString("en-GB", { hour12: false });
+  var np = document.getElementById("next-poll");
+  if (np) {
+    var interval = parseInt(np.dataset.interval || "300", 10);
+    var left = interval;
+    function tick() {
+      var m = Math.floor(left / 60), s = left % 60;
+      np.textContent = (m ? m + "m " : "") + s + "s";
+      left = left > 0 ? left - 1 : interval;
     }
-  }
-  tick();
-  setInterval(tick, 1000);
-
-  // --- Next-poll countdown -------------------------------------------
-  var npEl = document.getElementById("next-poll");
-  if (npEl) {
-    var interval = parseInt(npEl.dataset.interval || "300", 10);
-    var remaining = interval;
-    function fmt(s) {
-      var m = Math.floor(s / 60), ss = s % 60;
-      return m ? m + "m " + ss + "s" : ss + "s";
-    }
-    function count() {
-      npEl.textContent = fmt(remaining);
-      remaining = remaining > 0 ? remaining - 1 : interval;
-    }
-    count();
-    setInterval(count, 1000);
+    tick();
+    setInterval(tick, 1000);
   }
 })();

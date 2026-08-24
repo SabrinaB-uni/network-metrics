@@ -1,102 +1,63 @@
 {% extends "base.html" %}
-{% block title %}AP Status{% endblock %}
+{% block title %}AP status{% endblock %}
 {% block content %}
-<div class="page-head">
-  <div>
-    <h1 class="page-title">Access Point Status</h1>
-    <div class="page-sub">Last polled {{ last_polled|clock }} · {{ kpi.total }} APs monitored</div>
-  </div>
-  <a class="btn" href="{{ url_for('export_aps') }}">⬇ Export CSV</a>
-</div>
+
+<form class="filters" method="get">
+  <input type="text" name="q" value="{{ q }}" class="input" placeholder="Filter AP name">
+  <select name="status" class="select">
+    <option value="all"     {{ 'selected' if status == 'all' }}>All statuses</option>
+    <option value="online"  {{ 'selected' if status == 'online' }}>Online</option>
+    <option value="offline" {{ 'selected' if status == 'offline' }}>Offline</option>
+    <option value="high"    {{ 'selected' if status == 'high' }}>High load</option>
+  </select>
+  <button class="btn primary" type="submit">Apply</button>
+  <a class="btn" href="{{ url_for('export_aps') }}">Export CSV</a>
+  <span class="spacer"></span>
+  <span class="poll-info">Last poll <b>{{ last_polled|clock }}</b> · next in
+    <b id="next-poll" data-interval="{{ poll_interval }}">–</b></span>
+</form>
 
 <div class="kpi-row">
-  <div class="kpi kpi--total">
-    <div class="kpi-label">Total APs</div>
-    <div class="kpi-value">{{ kpi.total }}</div>
-    <div class="kpi-sub">across all floors</div>
-  </div>
-  <div class="kpi kpi--online">
-    <div class="kpi-label">Online</div>
-    <div class="kpi-value">{{ kpi.online }}</div>
-    <div class="kpi-sub">{{ kpi.availability }}% availability</div>
-  </div>
-  <div class="kpi kpi--offline">
-    <div class="kpi-label">Offline</div>
-    <div class="kpi-value">{{ kpi.offline }}</div>
-    <div class="kpi-sub">needs attention</div>
-  </div>
-  <div class="kpi kpi--clients">
-    <div class="kpi-label">Active clients</div>
-    <div class="kpi-value">{{ kpi.active_clients }}</div>
-    <div class="kpi-sub">connected now</div>
-  </div>
+  <div class="kpi kpi--aps"><div class="kpi-label">Access points</div><div class="kpi-value">{{ kpi.total }}</div></div>
+  <div class="kpi kpi--online"><div class="kpi-label">Online</div><div class="kpi-value">{{ kpi.online }}</div></div>
+  <div class="kpi kpi--offline"><div class="kpi-label">Offline</div><div class="kpi-value">{{ kpi.offline }}</div></div>
+  <div class="kpi kpi--clients"><div class="kpi-label">Clients</div><div class="kpi-value">{{ kpi.active_clients }}</div></div>
+  <div class="kpi kpi--load"><div class="kpi-label">High load</div><div class="kpi-value">{{ kpi.high_load }}</div></div>
 </div>
 
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Access points</div>
-    <div class="toolbar">
-      <form method="get" class="inline-form">
-        <input type="text" name="q" value="{{ q }}" class="input"
-               placeholder="Search AP name or location…">
-        {% if flt != 'all' %}<input type="hidden" name="filter" value="{{ flt }}">{% endif %}
-      </form>
-      <div class="seg">
-        <a href="{{ url_for('ap_status', filter='all', q=q) }}" class="{{ 'active' if flt=='all' }}">All</a>
-        <a href="{{ url_for('ap_status', filter='online', q=q) }}" class="{{ 'active' if flt=='online' }}">Online</a>
-        <a href="{{ url_for('ap_status', filter='offline', q=q) }}" class="{{ 'active' if flt=='offline' }}">Offline</a>
-        <a href="{{ url_for('ap_status', filter='alerts', q=q) }}" class="{{ 'active' if flt=='alerts' }}">Alerts</a>
-      </div>
-    </div>
-  </div>
-  <div class="panel-body flush">
-    <div class="table-wrap">
-      <table class="data">
-        <thead>
-          <tr>
-            <th>AP Name / Location</th><th>Status</th><th>Clients</th>
-            <th>Load</th><th>Uptime</th><th>Model</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for a in aps %}
-          <tr>
-            <td>
-              <span class="dot {{ 'online' if a.status == 'Online' else 'offline' }}"></span>
-              <span class="ap-name">{{ a.ap_name }}</span><br>
-              <span class="ap-loc">{{ a.floor }} · {{ a.location }}</span>
-            </td>
-            <td>
-              {% if a.status == 'Online' and a.load_class == 'high' %}
-                <span class="pill amber">High load</span>
-              {% elif a.status == 'Online' %}
-                <span class="pill green">Online</span>
-              {% else %}
-                <span class="pill red">Offline</span>
-              {% endif %}
-            </td>
-            <td class="num">{{ a.total_clients if a.status == 'Online' else '–' }}</td>
-            <td>
-              {% if a.status == 'Online' %}
-              <div class="load">
-                <span class="load-track">
-                  <span class="load-fill {{ a.load_class }}" style="width: {{ a.load_pct }}%"></span>
-                </span>
-                <span class="load-val">{{ a.load_pct }}%</span>
-              </div>
-              {% else %}<span class="dim">—</span>{% endif %}
-            </td>
-            <td class="mono {{ 'dim' if a.status == 'Offline' }}">
-              {{ a.uptime_secs|uptime if a.status == 'Online' else 'Offline' }}
-            </td>
-            <td class="dim mono">{{ a.model }}</td>
-          </tr>
-          {% else %}
-          <tr><td colspan="6" class="empty">No access points match.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+<div class="table-wrap">
+  <table class="data">
+    <thead>
+      <tr>
+        <th>AP name</th><th>Location</th><th>Status</th>
+        <th>Clients</th><th>Load</th><th class="right">Uptime</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for a in aps %}
+      <tr class="{{ 'row-offline' if a.status == 'Offline' }}">
+        <td class="ap-name">{{ a.ap_name }}</td>
+        <td class="ap-loc">{{ a.floor }} {{ a.location }}</td>
+        <td>
+          {% if a.status == 'Online' %}<span class="st-online">Online</span>
+          {% else %}<span class="st-offline">Offline</span>{% endif %}
+        </td>
+        <td class="num">{{ a.total_clients if a.status == 'Online' else '–' }}</td>
+        <td>
+          {% if a.status == 'Online' %}<span class="ld-{{ a.load_class }}">{{ a.load_pct }}%</span>
+          {% else %}<span class="dim">–</span>{% endif %}
+        </td>
+        <td class="right num dim">{{ a.uptime_secs|uptime if a.status == 'Online' else '–' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">No access points match.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="footer-bar">
+  <span>Showing {{ showing }} of {{ total }} access points</span>
+  <span>DB <span class="ok">connected</span> · {{ db_rows }} rows</span>
 </div>
 {% endblock %}

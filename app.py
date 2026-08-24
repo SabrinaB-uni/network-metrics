@@ -2,7 +2,7 @@ import csv
 import io
 from datetime import datetime
 
-from flask import Flask, render_template, request, redirect, url_for, Response
+from flask import Flask, render_template, request, url_for, Response
 
 import config
 import db
@@ -13,18 +13,12 @@ app = Flask(__name__)
 db.init_db()
 
 NAV = [
-    ("Monitoring", [
-        ("ap_status", "AP Status", "▦"),
-        ("analytics", "Analytics", "◍"),
-        ("client_log", "Client Log", "◉"),
-    ]),
-    ("System", [
-        ("api_config", "API Config", "⚙"),
-        ("poll_log", "Poll Log", "≣"),
-    ]),
-    ("Data", [
-        ("database", "Database", "◫"),
-    ]),
+    ("ap_status", "AP status"),
+    ("client_log", "Client log"),
+    ("analytics", "AP analysis"),
+    ("poll_log", "Poll history"),
+    ("api_config", "API config"),
+    ("database", "Database"),
 ]
 
 
@@ -36,7 +30,7 @@ def format_uptime(secs):
     days, rem = divmod(secs, 86400)
     hours, rem = divmod(rem, 3600)
     mins = rem // 60
-    return f"{days}d {hours}h" if days else f"{hours}h {mins}m"
+    return f"{days}d {hours:02d}h" if days else f"{hours}h {mins:02d}m"
 
 
 @app.template_filter("ago")
@@ -78,35 +72,33 @@ def fmt_bytes(n):
 
 def _annotate(aps):
     for a in aps:
-        high = a["load_pct"] >= 85
-        a["alert"] = a["status"] == "Offline" or high
+        high = a["status"] == "Online" and a["load_pct"] >= 85
         a["load_class"] = "high" if high else ("warn" if a["load_pct"] >= 60 else "ok")
+        a["high_load"] = high
     return aps
 
 
 @app.context_processor
 def inject_globals():
-    k = db.kpis()
-    failed = sum(1 for p in db.recent_poll_log(120) if not p["success"])
     return {
         "APP_NAME": config.APP_NAME,
         "APP_TAGLINE": config.APP_TAGLINE,
-        "data_source": config.data_source_label(),
         "use_mock": config.USE_MOCK,
         "poll_interval": config.POLL_INTERVAL,
-        "net_health": k["availability"],
         "last_polled": db.latest_snapshot_ts(),
         "nav": NAV,
-        "badges": {"ap_status": k["offline"] or None, "poll_log": failed or None, "database": "OK"},
-        "server_time": datetime.now().strftime("%H:%M:%S"),
     }
 
 
 @app.route("/")
 def ap_status():
     q = request.args.get("q", "").strip()
-    flt = request.args.get("filter", "all")
+    flt = request.args.get("status", "all")
+
     aps = _annotate(db.latest_aps())
+    kpi = db.kpis()
+    kpi["high_load"] = sum(1 for a in aps if a["high_load"])
+    total = len(aps)
 
     if q:
         ql = q.lower()
@@ -116,11 +108,15 @@ def ap_status():
         aps = [a for a in aps if a["status"] == "Online"]
     elif flt == "offline":
         aps = [a for a in aps if a["status"] == "Offline"]
-    elif flt == "alerts":
-        aps = [a for a in aps if a["alert"]]
+    elif flt == "high":
+        aps = [a for a in aps if a["high_load"]]
+
+    overview = db.db_overview()
+    db_rows = sum(t["rows"] for t in overview["tables"])
 
     return render_template("ap_status.html", active="ap_status",
-                           aps=aps, kpi=db.kpis(), q=q, flt=flt)
+                           aps=aps, kpi=kpi, q=q, status=flt,
+                           showing=len(aps), total=total, db_rows=db_rows)
 
 
 @app.route("/analytics")
@@ -193,13 +189,6 @@ def export_aps():
                          a["model"], a["timestamp"]])
     return Response(buf.getvalue(), mimetype="text/csv",
                     headers={"Content-Disposition": "attachment; filename=ap_status.csv"})
-
-
-@app.route("/refresh", methods=["POST"])
-def refresh():
-    from poller import poll_once
-    poll_once()
-    return redirect(request.referrer or url_for("ap_status"))
 
 
 if __name__ == "__main__":

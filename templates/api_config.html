@@ -6,12 +6,12 @@
     <h1 class="page-title">API Configuration</h1>
     <div class="page-sub">Aruba Central connection &amp; data source</div>
   </div>
-  <a class="btn" href="{{ url_for('api_config', test='1') }}">⚡ Test connection</a>
+  <a class="btn" href="{{ url_for('api_config', test='1') }}">Test connection</a>
 </div>
 
 {% if test %}
 <div class="note {{ 'ok' if test[0] else 'bad' }}" style="margin-bottom:20px">
-  {{ '✓' if test[0] else '✕' }} {{ test[1] }}
+  {{ test[1] }}
 </div>
 {% endif %}
 
