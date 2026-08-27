@@ -1,4 +1,4 @@
-"""Collect a snapshot from Aruba (mock or live) and write it to the database.
+"""Collect a snapshot from Aruba Central and write it to the database.
 
     python poller.py          poll forever on POLL_INTERVAL
     python poller.py --once    single poll, then exit
@@ -8,6 +8,7 @@ import logging
 import time
 from datetime import datetime
 
+import anomalies
 import config
 import db
 from aruba.client import get_client
@@ -36,6 +37,7 @@ def poll_once(client=None):
         db.record_poll(conn, client.source, len(aps), connected,
                        int((time.time() - started) * 1000), True, "ok", ts)
     log.info("polled %d APs / %d clients (%s)", len(aps), connected, client.source)
+    anomalies.run_detection()
     return {"aps": len(aps), "clients": connected}
 
 

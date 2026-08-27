@@ -1,21 +1,55 @@
 import csv
+import hmac
 import io
 from datetime import datetime
+from urllib.parse import urlparse
 
-from flask import Flask, render_template, request, url_for, Response
+from flask import Flask, render_template, request, url_for, redirect, session, Response
 
 import config
 import db
 import charts
+import security
+import anomalies
 from aruba.client import get_client
 
 app = Flask(__name__)
+app.secret_key = config.SECRET_KEY
 db.init_db()
+
+PUBLIC_ENDPOINTS = {"login", "static"}
+
+
+@app.before_request
+def require_login():
+    if request.endpoint not in PUBLIC_ENDPOINTS and not session.get("authed"):
+        return redirect(url_for("login"))
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if not config.DASHBOARD_PASSWORD:
+        error = "Login is not set up — add DASHBOARD_PASSWORD to .env."
+    elif request.method == "POST":
+        if hmac.compare_digest(request.form.get("password", ""), config.DASHBOARD_PASSWORD):
+            session["authed"] = True
+            return redirect(url_for("ap_status"))
+        error = "Incorrect password."
+    return render_template("login.html", error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
 
 NAV = [
     ("ap_status", "AP status"),
     ("client_log", "Client log"),
     ("analytics", "AP analysis"),
+    ("security_page", "Security"),
     ("poll_log", "Poll history"),
     ("api_config", "API config"),
     ("database", "Database"),
@@ -83,7 +117,6 @@ def inject_globals():
     return {
         "APP_NAME": config.APP_NAME,
         "APP_TAGLINE": config.APP_TAGLINE,
-        "use_mock": config.USE_MOCK,
         "poll_interval": config.POLL_INTERVAL,
         "last_polled": db.latest_snapshot_ts(),
         "nav": NAV,
@@ -157,10 +190,34 @@ def api_config():
         "base_url": config.ARUBA_BASE_URL or "(not set)",
         "client_id_set": bool(config.ARUBA_CLIENT_ID),
         "client_secret_set": bool(config.ARUBA_CLIENT_SECRET),
-        "access_token_set": bool(config.ARUBA_ACCESS_TOKEN),
-        "refresh_token_set": bool(config.ARUBA_REFRESH_TOKEN),
     }
     return render_template("api_config.html", active="api_config", cfg=cfg, test=test)
+
+
+@app.route("/security", methods=["GET", "POST"])
+def security_page():
+    if request.method == "POST" and request.form.get("action") == "baseline":
+        names = [a["ap_name"] for a in db.latest_aps()]
+        db.set_baseline_aps(names, datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+        return redirect(url_for("security_page"))
+
+    hosts = []
+    if config.ARUBA_BASE_URL:
+        hosts.append(urlparse(config.ARUBA_BASE_URL).hostname)
+    hosts.append("sso.common.cloud.hpe.com")
+    tls = [security.check_tls(h) for h in hosts if h]
+
+    known = db.get_known_aps()
+    aps = db.latest_aps()
+    for a in aps:
+        a["known"] = a["ap_name"] in known
+    unknown = [a for a in aps if not a["known"]]
+
+    anomalies.run_detection()
+    return render_template("security.html", active="security_page",
+                           tls=tls, aps=aps, known_count=len(known),
+                           unknown=unknown, baselined=bool(known),
+                           alerts=db.recent_alerts(30))
 
 
 @app.route("/poll-log")
@@ -192,4 +249,8 @@ def export_aps():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    import threading
+    import poller
+    # background poller: collects a snapshot on an interval so history builds itself
+    threading.Thread(target=poller.run_forever, daemon=True).start()
+    app.run(host="0.0.0.0", port=5000)

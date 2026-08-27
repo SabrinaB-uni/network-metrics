@@ -1,12 +1,40 @@
 {% extends "base.html" %}
-{% block title %}Client Log{% endblock %}
+{% block title %}Client log{% endblock %}
 {% block content %}
 <div class="page-head">
   <div>
-    <h1 class="page-title">Client Log</h1>
-    <div class="page-sub">Search the wireless client history — track a device across access points</div>
+    <h1 class="page-title">Client log</h1>
+    <div class="page-sub">Search the wireless client history and track a device across access points</div>
   </div>
 </div>
+
+{% if history is not none %}
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Connection history — <span class="mono">{{ mac }}</span></div>
+    <a class="btn" href="{{ url_for('client_log', q=q) }}">Close</a>
+  </div>
+  <div class="panel-body flush">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Time</th><th>Access point</th><th>Status</th></tr></thead>
+        <tbody>
+          {% for h in history %}
+          <tr>
+            <td class="mono dim">{{ h.timestamp }}</td>
+            <td class="mono">{{ h.ap_name or '—' }}</td>
+            <td>{% if h.status == 'Connected' %}<span class="st-online">Connected</span>
+                {% else %}<span class="st-off">Disconnected</span>{% endif %}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="3" class="empty">No history for this device.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
 
 <div class="panel">
   <div class="panel-head">
@@ -20,10 +48,8 @@
     <div class="table-wrap">
       <table class="data">
         <thead>
-          <tr>
-            <th>Host</th><th>IP</th><th>MAC</th><th>User</th><th>Role</th>
-            <th>Vendor / OS</th><th>Status</th><th>On AP</th><th></th>
-          </tr>
+          <tr><th>Host</th><th>IP</th><th>MAC</th><th>User</th><th>Role</th>
+              <th>Vendor / OS</th><th>Status</th><th>On AP</th><th></th></tr>
         </thead>
         <tbody>
           {% for c in clients %}
@@ -32,12 +58,10 @@
             <td class="mono dim">{{ c.ip or '—' }}</td>
             <td class="mono">{{ c.mac }}</td>
             <td>{{ c.username or '—' }}</td>
-            <td><span class="pill blue">{{ c.access_role or '—' }}</span></td>
+            <td class="role">{{ c.access_role or '—' }}</td>
             <td class="dim">{{ c.vendor }} · {{ c.model_os }}</td>
-            <td>
-              {% if c.status == 'Connected' %}<span class="pill green">Connected</span>
-              {% else %}<span class="pill">Disconnected</span>{% endif %}
-            </td>
+            <td>{% if c.status == 'Connected' %}<span class="st-online">Connected</span>
+                {% else %}<span class="st-off">Disconnected</span>{% endif %}</td>
             <td class="mono">{{ c.ap_name or '—' }}</td>
             <td><a class="btn" href="{{ url_for('client_log', mac=c.mac, q=q) }}">Track</a></td>
           </tr>
@@ -49,34 +73,4 @@
     </div>
   </div>
 </div>
-
-{% if history is not none %}
-<div class="panel">
-  <div class="panel-head">
-    <div class="panel-title">Connection history — <span class="mono">{{ mac }}</span></div>
-    <a class="btn" href="{{ url_for('client_log', q=q) }}">Close</a>
-  </div>
-  <div class="panel-body flush">
-    <div class="table-wrap">
-      <table class="data">
-        <thead><tr><th>Time</th><th>Access Point</th><th>Status</th></tr></thead>
-        <tbody>
-          {% for h in history %}
-          <tr>
-            <td class="mono dim">{{ h.timestamp }}</td>
-            <td class="mono">{{ h.ap_name or '—' }}</td>
-            <td>
-              {% if h.status == 'Connected' %}<span class="pill green">Connected</span>
-              {% else %}<span class="pill">Disconnected</span>{% endif %}
-            </td>
-          </tr>
-          {% else %}
-          <tr><td colspan="3" class="empty">No history for this device.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
-</div>
-{% endif %}
 {% endblock %}

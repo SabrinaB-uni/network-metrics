@@ -47,6 +47,21 @@ CREATE TABLE IF NOT EXISTS poll_log (
     message      TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_poll_log_ts ON poll_log(timestamp);
+
+CREATE TABLE IF NOT EXISTS known_aps (
+    ap_name  TEXT PRIMARY KEY,
+    added_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS alerts (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    severity  TEXT,
+    rule      TEXT,
+    entity    TEXT,
+    detail    TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_alerts_ts ON alerts(timestamp);
 """
 
 
@@ -259,6 +274,45 @@ def db_overview():
                 {"name": t, "rows": count, "first": rng["lo"], "last": rng["hi"]}
             )
     return out
+
+
+def get_known_aps():
+    with connection() as conn:
+        return {r["ap_name"] for r in conn.execute("SELECT ap_name FROM known_aps")}
+
+
+def set_baseline_aps(names, ts):
+    with connection() as conn:
+        conn.executemany(
+            "INSERT OR IGNORE INTO known_aps (ap_name, added_at) VALUES (?, ?)",
+            [(n, ts) for n in names],
+        )
+
+
+def add_alert(ts, severity, rule, entity, detail):
+    with connection() as conn:
+        conn.execute(
+            "INSERT INTO alerts (timestamp, severity, rule, entity, detail) VALUES (?, ?, ?, ?, ?)",
+            (ts, severity, rule, entity, detail),
+        )
+
+
+def alert_exists_recent(rule, entity, minutes):
+    with connection() as conn:
+        row = conn.execute(
+            "SELECT 1 FROM alerts WHERE rule = ? AND entity = ? "
+            "AND timestamp >= datetime('now', 'localtime', ?) LIMIT 1",
+            (rule, entity, f"-{minutes} minutes"),
+        ).fetchone()
+        return row is not None
+
+
+def recent_alerts(limit=50):
+    with connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM alerts ORDER BY id DESC LIMIT ?", (limit,)
+        ).fetchall()
+        return [dict(r) for r in rows]
 
 
 def recent_rows(table, limit=25):

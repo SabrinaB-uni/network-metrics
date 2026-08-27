@@ -21,17 +21,10 @@
     <div class="panel-body">
       <div class="kv">
         <span class="k">Active source</span>
-        <span class="v">
-          {% if use_mock %}<span class="pill amber">MOCK DATA</span>
-          {% else %}<span class="pill green">LIVE API</span>{% endif %}
-        </span>
+        <span class="v"><span class="pill green">LIVE</span></span>
       </div>
       <div class="kv"><span class="k">Poll interval</span><span class="v">{{ poll_interval }}s</span></div>
       <div class="kv"><span class="k">Last poll</span><span class="v">{{ last_polled|clock }} · {{ last_polled|ago }}</span></div>
-      <p class="note" style="margin-top:14px">
-        Switch sources by setting <span class="mono">USE_MOCK</span> in
-        <span class="mono">.env</span>, then restart the app.
-      </p>
     </div>
   </div>
 
@@ -43,11 +36,9 @@
         <span class="v">{% if cfg.client_id_set %}<span class="pill green">set</span>{% else %}<span class="pill red">missing</span>{% endif %}</span></div>
       <div class="kv"><span class="k">Client secret</span>
         <span class="v">{% if cfg.client_secret_set %}<span class="pill green">set</span>{% else %}<span class="pill red">missing</span>{% endif %}</span></div>
-      <div class="kv"><span class="k">Access token</span>
-        <span class="v">{% if cfg.access_token_set %}<span class="pill green">set</span>{% else %}<span class="pill red">missing</span>{% endif %}</span></div>
-      <div class="kv"><span class="k">Refresh token</span>
-        <span class="v">{% if cfg.refresh_token_set %}<span class="pill green">set</span>{% else %}<span class="pill red">missing</span>{% endif %}</span></div>
+      <div class="kv"><span class="k">Access token</span><span class="v"><span class="pill green">auto</span></span></div>
       <p class="note" style="margin-top:14px">
+        The bearer token is fetched automatically from HPE GreenLake using the client ID/secret.
         Secrets are read from <span class="mono">.env</span> and are never displayed or logged.
       </p>
     </div>

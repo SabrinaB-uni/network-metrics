@@ -1,0 +1,111 @@
+{% extends "base.html" %}
+{% block title %}Security{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">Security</h1>
+    <div class="page-sub">Transport security of the cloud endpoints and access-point trust</div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Alerts ({{ alerts|length }})</div></div>
+  <div class="panel-body flush">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>Time</th><th>Severity</th><th>Rule</th><th>Entity</th><th>Detail</th></tr></thead>
+        <tbody>
+          {% for al in alerts %}
+          <tr>
+            <td class="mono dim">{{ al.timestamp }}</td>
+            <td>
+              {% if al.severity == 'critical' %}<span class="st-offline">CRITICAL</span>
+              {% else %}<span class="ld-warn">WARNING</span>{% endif %}
+            </td>
+            <td class="mono">{{ al.rule }}</td>
+            <td>{{ al.entity }}</td>
+            <td class="dim">{{ al.detail }}</td>
+          </tr>
+          {% else %}
+          <tr><td colspan="5" class="empty">No alerts — all clear.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Transport security (TLS)</div></div>
+  <div class="panel-body flush">
+    <div class="table-wrap">
+      <table class="data">
+        <thead>
+          <tr><th>Endpoint</th><th>Result</th><th>Protocol</th><th>Issuer</th>
+              <th>Expires</th><th class="right">Days left</th></tr>
+        </thead>
+        <tbody>
+          {% for t in tls %}
+          <tr>
+            <td class="mono">{{ t.host }}</td>
+            <td>
+              {% if t.verdict == 'OK' %}<span class="st-online">OK</span>
+              {% elif t.verdict == 'WARN' %}<span class="ld-warn">WARN</span>
+              {% else %}<span class="st-offline">FAIL</span>{% endif %}
+              <span class="dim">{{ t.reason }}</span>
+            </td>
+            <td class="mono">{{ t.protocol or '—' }}</td>
+            <td>{{ t.issuer or '—' }}</td>
+            <td class="mono">{{ t.expires or '—' }}</td>
+            <td class="right num">{{ t.days_left if t.days_left is not none else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head">
+    <div class="panel-title">Access-point trust</div>
+    <form method="post" class="inline-form">
+      <input type="hidden" name="action" value="baseline">
+      <button class="btn primary" type="submit">{{ 'Re-baseline current APs' if baselined else 'Trust all current APs' }}</button>
+    </form>
+  </div>
+  <div class="panel-body">
+    {% if not baselined %}
+      <div class="note">No trusted baseline yet. Recording the {{ aps|length }} access points you
+        have now marks them as known; after that, any unrecognised AP is flagged as a possible rogue.</div>
+    {% else %}
+      <div class="kv"><span class="k">Trusted access points</span><span class="v">{{ known_count }}</span></div>
+      <div class="kv"><span class="k">Unknown / rogue right now</span>
+        <span class="v {{ 'st-offline' if unknown else 'st-online' }}">{{ unknown|length }}</span></div>
+    {% endif %}
+  </div>
+</div>
+
+{% if baselined %}
+<div class="panel">
+  <div class="panel-head"><div class="panel-title">Access points ({{ aps|length }})</div></div>
+  <div class="panel-body flush">
+    <div class="table-wrap">
+      <table class="data">
+        <thead><tr><th>AP name</th><th>Location</th><th>Trust</th></tr></thead>
+        <tbody>
+          {% for a in aps %}
+          <tr class="{{ 'row-offline' if not a.known }}">
+            <td class="ap-name">{{ a.ap_name }}</td>
+            <td class="dim">{{ a.location }}</td>
+            <td>{% if a.known %}<span class="st-online">Trusted</span>
+                {% else %}<span class="st-offline">UNKNOWN</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

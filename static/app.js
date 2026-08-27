@@ -21,6 +21,15 @@
     });
   }
 
+  var navBtn = document.getElementById("nav-toggle");
+  if (localStorage.getItem("nav") === "hidden") document.body.classList.add("nav-hidden");
+  if (navBtn) {
+    navBtn.addEventListener("click", function () {
+      document.body.classList.toggle("nav-hidden");
+      localStorage.setItem("nav", document.body.classList.contains("nav-hidden") ? "hidden" : "shown");
+    });
+  }
+
   var np = document.getElementById("next-poll");
   if (np) {
     var interval = parseInt(np.dataset.interval || "300", 10);
