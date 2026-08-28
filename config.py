@@ -1,3 +1,4 @@
+"""App settings and secrets, loaded from the local .env file."""
 import os
 import secrets
 

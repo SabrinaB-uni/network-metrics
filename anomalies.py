@@ -1,3 +1,4 @@
+"""Anomaly detection: scans the latest data for problems, logs alerts, and can push them to Slack."""
 import statistics
 from datetime import datetime
 

@@ -1,3 +1,4 @@
+"""Security checks — a TLS/certificate inspector for the cloud endpoints the app talks to."""
 import socket
 import ssl
 import time

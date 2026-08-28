@@ -1,3 +1,5 @@
+"""Flask web app: the page routes, the login gate, and the display filters.
+Run this file to start the dashboard."""
 import csv
 import hmac
 import io

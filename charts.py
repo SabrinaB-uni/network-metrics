@@ -1,3 +1,4 @@
+"""Builds the line and bar charts on the AP analysis page as inline SVG (no chart library)."""
 import html
 
 

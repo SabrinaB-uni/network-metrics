@@ -1,3 +1,4 @@
+// Small browser-side bits: the theme toggle, the collapsible menu, and the poll countdown.
 (function () {
   var root = document.documentElement;
   var toggle = document.getElementById("theme-toggle");

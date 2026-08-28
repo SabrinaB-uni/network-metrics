@@ -1,3 +1,4 @@
+"""SQLite database layer: the table definitions and every query the app uses."""
 import os
 import sqlite3
 from contextlib import contextmanager

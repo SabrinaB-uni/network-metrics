@@ -1,3 +1,5 @@
+"""Live client for the Aruba Central (New Central / HPE GreenLake) API:
+gets an access token, then fetches access points and clients."""
 import time
 
 import requests
